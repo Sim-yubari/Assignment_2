@@ -1,0 +1,184 @@
+---
+title: "Are the planet's children getting the protection they deserve?"
+format: html
+author: Siming Wang 23265414
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+```{css, echo=FALSE}
+body {
+    background-color: #e0e8e0; #Adjust the background color
+}
+
+```{r}
+#| label: setup
+#| include: false
+# Library packages used in the file.
+library (tidyverse) 
+library (maps)
+library (dplyr)
+library (htmltools)
+#read all data sources from work directory.
+unicef_indicator_1 <- read.csv("C:/Users/zodia/Desktop/data analytic/assignment_2/unicef_indicator_1.csv", header = TRUE) 
+unicef_indicator_2 <- read.csv("C:/Users/zodia/Desktop/data analytic/assignment_2/unicef_indicator_2.csv", header = TRUE)
+unicef_metadata <- read.csv("C:/Users/zodia/Desktop/data analytic/assignment_2/unicef_metadata.csv", header = TRUE)
+child.death.rate <- read.csv("C:/Users/zodia/Desktop/data analytic/assignment_2/child death rate.csv", header = TRUE) 
+average.gdp <- read.csv("C:/Users/zodia/Desktop/data analytic/assignment_2/average gdp.csv", header = TRUE)
+countries.and.continent <- read.csv("C:/Users/zodia/Desktop/data analytic/assignment_2/countries and continent.csv", header = TRUE)
+```
+```{r}
+#| label: picture_1
+# insert a picture at top-right corner
+image_html <- paste('<div style="position: absolute; top: 0; right: 0;">',
+                    '<img src="stc.jpg" width="200">',
+                    '</div>', sep = '')
+HTML(image_html)
+```
+```{r}
+#| label: picture_2
+# insert a picture at top-left corner
+image_html <- paste('<div style="position: absolute; top: 0; left: 0;">',
+                    '<img src="unicef.png" width="200">',
+                    '</div>', sep = '')
+HTML(image_html)
+```
+```{r}
+#| label: sum_of_children
+#| include: false
+# data transformation
+options(scipen = 999)
+children_total <- left_join(unicef_indicator_2, countries.and.continent, by = "country_abb_2") %>% #I use left_join because the data I collected myself from UNICEF contains more countries than the data files from Damien. All the left_join functions in other chunks are used for the same reason.
+  filter(time_period == '2020') %>%
+  summarise(c_pop_global = sum(obs_value))
+```
+## The present state of social and financial protection for children who suffered loss
+In the year of 2020, there are an estimated total of <span style="color: red;">***83,809,310***</span> children who suffered loss of at least one of their parents. These children should receive financial and social protection so that they can grow up just like others. However, the sad truth is that many of them have not. In order to find answers to this problem, we must study the distribution of these children who need help, and the reason that prevents them from getting the help.
+
+```{r}
+#| label: map_1
+# data transformation
+options(scipen = 999)
+number_of_children <- filter(unicef_indicator_2, time_period == '2020') 
+map_world_1 <- map_data("world")
+heatmap_distribution <- full_join(map_world_1, number_of_children, by = c('region' = 'country'))
+#mapping
+ggplot(data = heatmap_distribution) +
+  aes(x = long, y = lat, group = group, fill = obs_value) +
+  geom_polygon() +
+  scale_fill_gradient(low = "green", high = "red", na.value = "grey") +
+  labs(
+    title = "Distribution of Children who suffered loss",
+    subtitle = "Countries in grey have no data in UNICEF's data base.",
+    caption = "Source: UNICEF Data Base",
+    x = 'Longitude',
+    y = 'Latitude',
+    fill = "Number of children"
+  ) +
+  theme_classic()
+
+```
+
+
+Next we will see how many children need help in each continent.
+
+```{r}
+#| label: bar_chart
+# data transformation
+options(scipen = 999)
+children_in_continent <- left_join(unicef_indicator_2, countries.and.continent, by = "country_abb_2") %>% 
+  filter(time_period == '2020') %>%
+  group_by(continent) %>%
+  summarise(c_pop = sum(obs_value))
+# create bar chart
+ggplot(children_in_continent, aes(continent, c_pop, fill = continent)) +
+  geom_col() +
+  facet_wrap(~ continent, nrow = 2) + #I am not sure whether I want to put them separated, maybe it looks nicer together and create a stronger comparison. But I decide to continue with this to showcase knowledge learned in class.
+  labs(
+    title = "Number of children suffered loss in each continent in 2020",
+    caption = "Source: UNICEF Data Base",
+    x = " ", #continent names overlay each other in x axis, so I want to leave it blank.
+    y = "Number of Children who need help",
+    fill = "Continent"
+  ) +
+  scale_x_discrete(labels = NULL) +  # Set x axis label to blank
+  theme_classic()
+```
+With distribution of children who suffered loss known, let's see how many of them are currently offered help.
+```{r}
+#| label: map_2
+# data transformation
+options(scipen = 999)
+children_percentage <- select(unicef_indicator_1, country, obs_value)
+#mapping
+  map_world_2 <- map_data("world") 
+children_percentage_map <- full_join(map_world_2, children_percentage, by = c("region" = "country"))
+ggplot(data = children_percentage_map) +
+  aes(x = long, y = lat, group = group, fill = obs_value) +
+  geom_polygon()+
+scale_fill_gradient(low = "red", high = "green", na.value = "grey") +
+  labs(
+    title = "Social and financial help coverage for children who suffered loss",
+    subtitle = "Countries in grey have no data in UNICEF's data base.",
+    caption = "Source: UNICEF Data Base",
+    x = 'Longitude',
+    y = 'Latitude',
+    fill = "Percentage in %"
+  ) +
+  theme_classic()
+```
+## Why are so many children not receiving the protection they need?
+In the map, we can tell that protection coverage in Africa and Asia is significantly lower. Coincidentally, these two continents contributes to <span style="color: red;">***86.6%***</span> of the children who need public support in the world. Why does this happen? Existing evidence points out that general economy plays an important role here, as the following scatter plot shows the relationship between GDP per capita and mortality rate of children aged between 5-14.
+```{r}
+#| label: scatter_plot
+# data transformation
+options(scipen = 999)
+mortality_rate <- left_join(unicef_metadata, child.death.rate, by = "country_abb_2") %>%
+  filter(year == '2020')
+#create scatter plot
+ggplot(mortality_rate, aes(x = GDP.per.capita..constant.2015.US.., y = OBS_VALUE.Observation.Value)) +
+  geom_point(color = "blue", size = 1, alpha = 0.5) +  
+  geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "solid") +  #Add linear regression line as requested in the assignment instructions.
+  labs(
+    title = 'Average GDP vs. Child mortality Rate for all countries in 2020',
+    subtitle = 'Data for some countries are not displayed due to lack of data entry in UNICEF data base.',
+    caption = "Source: UNICEF Data Base",
+    x = "Average GDP",
+    y = "Mortality Rate"
+  ) +
+  theme_minimal() +  
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),  
+    axis.title = element_text(size = 14, face = "bold")   
+  ) +
+  xlim(0, NA) +  
+  ylim(0, NA)    #Negative values here doesn't really make sense because both mortality rate and average GDP will not drop below 0. I want to remove the negative parts in both axes.
+
+  aes(x = , y = , color = continent) +
+  geom_point()
+```
+There's a negative correlation between mortality rate of children and average GDP of the country they live in. This argument also supports the next times series chart of life expectancy.
+```{r}
+#| label: time_series chart
+#data transformation
+life_expectancy <- select (unicef_metadata, country, year, Life.expectancy.at.birth..total..years.)
+#create time series chart
+ggplot(data = life_expectancy) +
+  aes(x = year, y = Life.expectancy.at.birth..total..years., color = country) +
+  geom_line(size = 0.1) +
+  guides(color ="none") + # removes legend because there are too many countries
+  labs(
+    title = "Life Expectancy for all countries from 1960-2020",
+    x = "Time",
+    y = "Life Expectancy (years)",
+    caption = "Source: UNICEF"
+  ) +
+  theme_minimal()
+```
+As we can see, the life expectancy in most countries rises over time apart from several extreme cases and COVID-19, because the world economy grows in the past decades. As a result, the mortality rate of children must be lower, otherwise the life expectancy will drop massively if children are more likely to die at young age.
+
+In conclusion, the main factor that effects whether children who suffered loss can access necessary financial and social support is the general economy. With most the children who need help located in poorer regions in Africa and Asia, it is imminent for the rest of the world to lend a helping hand.
+
+<span style="font-size: 22px; color: orange;">Save the children, save the future.</span>
+
